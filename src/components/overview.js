@@ -8,6 +8,7 @@ const wac_proto = WorkspaceAnimationController.prototype;
 
 const Me = imports.misc.extensionUtils.getCurrentExtension();
 const ColorEffect = Me.imports.conveniences.color_effect.ColorEffect;
+const BlurEffect = Me.imports.conveniences.blur_effect.BlurEffect;
 
 
 
@@ -157,11 +158,13 @@ var OverviewBlur = class OverviewBlur {
                 'blue' : this.prefs.BLUE.get(),
                 'blend' : this.prefs.BLEND.get(),
             });
-            bg_actor.add_effect(color_effect);
+         //   bg_actor.add_effect(color_effect);
         }
 
-        bg_actor.add_effect(effect);
+       // bg_actor.add_effect(effect);
         this.effects.push(effect);
+
+        bg_actor.add_effect(BlurEffect(bg_actor.get_height(), bg_actor.get_width()));
 
         bg_actor.set_x(monitor.x);
         bg_actor.set_y(monitor.y);

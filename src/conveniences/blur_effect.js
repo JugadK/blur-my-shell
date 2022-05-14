@@ -14,36 +14,97 @@ const Preferences = new Prefs(Keys);
 // GJS Doc https://gjs-docs.gnome.org/clutter10~10_api/clutter.shadereffect
 
 
-function BlurEffect() {
+function BlurEffect(height, width) {
 
-	let blur = Clutter.ShaderEffect.new(1);
+	let blur = Clutter.ShaderEffect.new(0);
 	
-	blur.set_shader_source(`
-  uniform sampler2D tex;					\
-  //uniform float x_step, y_step;
-  //uniform float brightness, contrast;
-  uniform float;
-  uniform float;
-  float brightness = 1.6;
-  float radius = 4.0;
- void main (){						\
-    vec4 color = texture2D (tex, vec2(cogl_tex_coord_in[0]));
-      float u, v;
-     int count = 1;
-     for (u=-radius;u<radius;u++)
-       for (v=-radius;v<radius;v++)
-         {
-           color += texture2D(tex, 
-               vec2(cogl_tex_coord_in[0].s + u * 2.0 * x_step, 
-                    cogl_tex_coord_in[0].t + v * 2.0 * y_step));
-           count ++;
-         }
-     color = color / float(count);
-     cogl_color_out = color;    
-        cogl_color_out = cogl_color_out * cogl_color_in; 
+blur.set_shader_source(`
+  uniform sampler2D tex;					
+  uniform float sigma;                                                      
+uniform float pixel_step;                                                 
+vec2 direction = vec2(2.0,1.0);                                                   
+
+
+
+ void main (){						
+
+   vec2 uv = vec2 (cogl_tex_coord_in[0]);                                    
+                                                                          
+   vec3 gauss_coefficient;                                                
+   gauss_coefficient.x = 1.0 / (sqrt (2.0 * 3.14159265) * sigma);         
+   gauss_coefficient.y = exp (-0.5 / (sigma * sigma));                    
+   gauss_coefficient.z = gauss_coefficient.y * gauss_coefficient.y;       
+                                                                          
+   float gauss_coefficient_total = gauss_coefficient.x;                   
+                                                                          
+   vec4 ret = texture2D (cogl_sampler, uv) * gauss_coefficient.x;         
+   gauss_coefficient.xy *= gauss_coefficient.yz;                          
+                                                                          
+   int n_steps = int (ceil (1.5 * sigma)) * 2;                            
+                                                                          
+   for (int i = 1; i <= n_steps; i += 2) {                                
+     float coefficient_subtotal = gauss_coefficient.x;                    
+     gauss_coefficient.xy *= gauss_coefficient.yz;                        
+     coefficient_subtotal += gauss_coefficient.x;                         
+                                                                          
+     float gauss_ratio = gauss_coefficient.x / coefficient_subtotal;      
+                                                                          
+     float foffset = float (i) + gauss_ratio;                             
+     vec2 offset = direction * foffset * pixel_step;                      
+                                                                          
+     ret += texture2D (cogl_sampler, uv + offset) * coefficient_subtotal; 
+     ret += texture2D (cogl_sampler, uv - offset) * coefficient_subtotal; 
+                                                                          
+     gauss_coefficient_total += 2.0 * coefficient_subtotal;               
+     gauss_coefficient.xy *= gauss_coefficient.yz;                        
+   }                                                                      
+                                                                          
+   cogl_texel = ret / gauss_coefficient_total;                            
+    
+
+  
+     
       }
 
-`);
+`); 
+
+/*blur.set_shader_source(`
+uniform sampler2D tex;					
+//uniform float x_step, y_step;
+//uniform float brightness, contrast;
+uniform float x_step;
+uniform float y_step;
+float brightness = 1.6;
+float radius = 5.0;
+
+define SAMPLE(offx, offy) {
+  cogl_texel += texture2D (cogl_sampler, cogl_tex_coord.st + pixel_step *  
+  vec2 ( G_STRINGIFY (offx) ,  G_STRINGIFY (offy) ));
+  }
+
+uniform vec2 pixel_step;
+void main (){						
+  cogl_texel = texture2D (cogl_sampler, cogl_tex_coord.st);
+
+  SAMPLE (-1.0, -1.0);
+  SAMPLE ( 0.0, -1.0);
+  SAMPLE (+1.0, -1.0);
+  SAMPLE (-1.0,  0.0);
+  SAMPLE (+1.0,  0.0);
+  SAMPLE (-1.0, +1.0);
+  SAMPLE ( 0.0, +1.0);
+  SAMPLE (+1.0, +1.0);
+  cogl_texel /= 9.0;
+
+
+  // cogl_color_out = color;    
+  //    cogl_color_out = cogl_color_out * cogl_color_in; 
+    }
+
+`); */
+
+blur.set_uniform_value("pixel_step", 1.0/height);
+blur.set_uniform_value("sigma", 1.0 );
 
 
 return blur;
